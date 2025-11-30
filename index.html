@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BON Cafe - Employee Portal</title>
+    <title>BON Cafe Employee Portal</title>
     <style>
         :root {
             --primary: #F68B1F; /* BON Cafe Orange */
@@ -278,7 +278,8 @@
     <!-- JAVASCRIPT -->
     <script>
         // *** CONFIGURATION ***
-        const API_URL = "https://script.google.com/a/macros/bon.com.sa/s/AKfycbwNkD3VNQUPzjVyK058JUBYImkqBJhsOUPn-Ssc2x7GA2o1IGsJuNkun1wROw4eQfnVQg/exec"; // <--- PASTE DEPLOYED URL HERE
+        // PASTE YOUR NEW "ANYONE" URL HERE
+        const API_URL = "https://script.google.com/macros/s/AKfycbwNkD3VNQUPzjVyK058JUBYImkqBJhsOUPn-Ssc2x7GA2o1IGsJuNkun1wROw4eQfnVQg/exec"; 
 
         // *** STATE MANAGEMENT ***
         let currentUser = null;
@@ -288,11 +289,10 @@
         function showPage(id) {
             document.querySelectorAll('body > div').forEach(div => div.classList.add('hidden'));
             document.getElementById(id).classList.remove('hidden');
-            if(id === 'home-section') document.getElementById('loader').classList.add('hidden'); // Ensure loader is off
+            if(id === 'home-section') document.getElementById('loader').classList.add('hidden');
         }
 
         function openSection(id) {
-            // Hide all sub-sections inside main-container
             ['home-section', 'profile-section', 'training-section', 'dashboard-section'].forEach(sec => {
                 document.getElementById(sec).classList.add('hidden');
             });
@@ -305,6 +305,19 @@
             else loader.classList.add('hidden');
         }
 
+        // *** API HELPER (The Fix) ***
+        // We send data as text/plain to avoid CORS Preflight checks from Google
+        function sendRequest(data) {
+            return fetch(API_URL, {
+                method: "POST",
+                redirect: "follow",
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8",
+                },
+                body: JSON.stringify(data),
+            }).then((res) => res.json());
+        }
+
         // *** AUTHENTICATION ***
         document.getElementById('login-form').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -312,11 +325,8 @@
             const p = document.getElementById('login-pass').value;
 
             toggleLoader(true);
-            fetch(API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'login', username: u, password: p })
-            })
-            .then(res => res.json())
+            
+            sendRequest({ action: 'login', username: u, password: p })
             .then(data => {
                 toggleLoader(false);
                 if(data.status === 'success') {
@@ -324,7 +334,6 @@
                     document.getElementById('welcome-msg').innerText = "Hello, " + data.name;
                     document.getElementById('display-name').innerText = data.name;
                     
-                    // Parse profile data if exists
                     if(data.profile && data.profile !== "{}") {
                         currentProfile = JSON.parse(data.profile);
                         populateProfileForm(currentProfile);
@@ -336,7 +345,11 @@
                     alert(data.message);
                 }
             })
-            .catch(err => { toggleLoader(false); alert("Connection Error"); });
+            .catch(err => { 
+                toggleLoader(false); 
+                console.error(err);
+                alert("Connection Error. Check Console (F12) or Deployment Permissions."); 
+            });
         });
 
         document.getElementById('register-form').addEventListener('submit', function(e) {
@@ -351,11 +364,7 @@
             };
 
             toggleLoader(true);
-            fetch(API_URL, {
-                method: 'POST',
-                body: JSON.stringify(data)
-            })
-            .then(res => res.json())
+            sendRequest(data)
             .then(data => {
                 toggleLoader(false);
                 if(data.status === 'success') {
@@ -364,6 +373,10 @@
                 } else {
                     alert(data.message);
                 }
+            })
+            .catch(err => {
+                toggleLoader(false);
+                alert("Registration Failed. Check connection.");
             });
         });
 
@@ -391,7 +404,6 @@
         document.getElementById('profile-form').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Handle Image Reading
             const fileInput = document.getElementById('p-pic-upload');
             let base64Img = currentProfile.pic || "";
 
@@ -410,15 +422,11 @@
                 };
 
                 toggleLoader(true);
-                fetch(API_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        action: 'updateProfile',
-                        username: currentUser,
-                        profileData: profileData
-                    })
+                sendRequest({
+                    action: 'updateProfile',
+                    username: currentUser,
+                    profileData: profileData
                 })
-                .then(res => res.json())
                 .then(data => {
                     toggleLoader(false);
                     if(data.status === 'success') {
